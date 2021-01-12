@@ -9,3 +9,12 @@ Eventually you will be able to install the R package from this repository but mu
 
 
 The directory `test` contains some scripts used for testing and development.
+
+## Current status
+
+Right now the main fitting function has been written.
+There is a small test (takes ~3 minutes to run 1250 iterations w/ 200 trees, which is decidedly overkill for this problem).
+The function recovery looks something like this.
+
+[!Alt text](writing/figures/curve_recovery.png$raw=true)
+
