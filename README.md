@@ -17,3 +17,4 @@ There is a small test (takes ~3 minutes to run 1250 iterations w/ 200 trees, whi
 The function recovery is in the file `writing/figures/curve_recovery.png`
 
 
+![my image](https://github.com/skdeshpande91/spline_BART/blob/main/writing/figures/curve_recovery.png)
