@@ -1,0 +1,428 @@
+%!TEX root = splineBART_main.tex
+
+In order to simulate approximate samples from the posterior $p(\Ecal, \sigma \vert \bY),$ we extend the basic Gibbs sampler for BART developed in \citet{Chipman2010}.
+At a high level, our sampler alternates between (i) updating each regression tree $(T_{m}, \bmu_{m})$ conditionally on the remaining trees and $\sigma$ and (ii) updating $\sigma$ conditionally given the full tree ensemble $\Ecal.$
+
+
+\textbf{Updating $\sigma$}. Let $\br_{1}, \ldots, \br_{n}$ be the n residual vectors defined by
+$$
+\br_{i} = \by_{i} - \Phi_{i}\sum_{m = 1}^{M}{g(\bz_{i}; T_{m}, \bmu_{m})}.
+$$
+Observe that the conditional posterior density of $\sigma^{2}$ given the data $\bY$ and the tree ensemble $\Ecal$ is given by
+$$
+p(\sigma^{2} \vert \bY, \Ecal) \propto p(\sigma^{2})\times(\sigma^{2})^{-\frac{N}{2}}\exp\{-\frac{1}{2\sigma^{2}}\sum_{i = 1}^{n}{\br_{i}^{\top}\br_{i}}\},
+$$
+where $N = \sum_{i}{n_{i}}$ is the total number of observations across all surfaces.
+
+With conjugate prior $\sigma^{2} \sim \text{Inv. Gamma}(\nu/2, \lambda\nu/2),$ we conclude
+$$
+\sigma^{2} \vert \bY, \Ecal \sim \text{Inv. Gamma}\left(\frac{\nu + N}{2}, \frac{1}{2}\left(\lambda\nu + \sum_{i = 1}^{n}{\br_{i}^{\top}\br_{i}}\right)\right).
+$$
+
+
+\skd{We could also place a half-$t_{\nu}$ prior on $\sigma$. If we did, we would need to use a MH step but there's a really clever choice of transition that makes this incredibly easy. Will fill in the details later on.} 
+
+\textbf{Updating regression trees}. 
+Like \citet{Chipman2010}, we update the $m^{\text{th}}$ regression tree $(T_{m}, \bmu_{m})$ in two steps.
+Given the current value of the $m^{\text{th}}$ decision tree, we draw a new decision tree from the marginal posterior distribution $p(T_{m} \vert \bY, \sigma, \Ecal^{-(m)}).$
+Then, conditionally on the value of $T_{\text{new}},$ we draw new jumps from the conditional posterior $p(\bmu \vert T_{\text{new}}, \bY, \sigma, \Ecal^{-(m)}).$
+
+We use a Metropolis-Hastings step to draw a new decision tree.
+Specifically, given the current value $T_{m} = T$ we propose a new tree $T^{\star}$ according to a transition kernel $q(\cdot \vert T)$ and compute the MH acceptance ratio
+\begin{equation}
+\label{eq:mh_ratio}
+\alpha(T, T^{\star}) = \frac{p(T^{\star})p(\bY \vert T^{\star}, \Ecal^{-(m)})q(T \vert T^{\star})}{p(T)p(\bY \vert T, \Ecal^{-(m)})q(T^{\star} \vert T)} \wedge 1
+\end{equation}
+We then set $T_{m} = T^{\star}$ with probability $\alpha(T, T^{\star})$ and set $T_{m} = T$ with residual probability.
+
+We use a simplified version of \citet{Chipman1998}'s transition kernel, constructing the new tree $T^{\star}$ by randomly (i) splitting an existing leaf node into two additional leafs (a \texttt{GROW} move) or (ii) collapsing two existing leafs with common to their common parent (a \texttt{PRUNE} move).
+We construct the transition kernel in such a way to facilitate considerable cancellation in the acceptance ratio.
+Before deriving closed form expressions of the acceptance ratios for each move, we first derive a closed form expression of the marginal likelihood of the decision tree $T_{m}$ given the remaining $M - 1$ trees.
+In doing so, we derive the conditional posterior distribution of the jumps $\bmu_{m}.$
+
+\subsection{Marginal likelihood of $T_{m}$}
+
+In order to evaluate the acceptance ratio in Equation~\eqref{eq:mh_ratio}, we must compute the marginal likelihood of the $m^{\text{th}}$ decision tree $T_{m}$ given the ensemble $\Ecal^{-(m)}.$
+To this end, first observe that the marginal likelihood of the \textit{regression tree} $(T_{m}, \bmu_{m})$ is given by
+\begin{equation}
+\label{eq:reg_tree_likelihood1}
+p(\by \vert T_{m}, \bmu_{m}, \Ecal^{-(m)}, \sigma^{2}) \propto \exp\left\{-\frac{1}{2\sigma^{2}}\sum_{i = 1}^{n}{\lVert \br_{i}^{(-m)} - \Phi_{i}g(\bz_{i}; T_{m}, \bmu_{m})\rVert_{2}^{2}}\right\}
+\end{equation}
+where $\br_{1}^{(-m}), \ldots, \br_{n}^{(-m)}$ are the $n$ \textit{partial residual} vectors
+$$
+\br_{i}^{(-m)} = \by_{i} - \Phi_{i}\sum_{m' \neq m}{g(\bz_{i}; T_{m'}, \bmu_{m'})}
+$$
+
+Now, suppose $T_{m}$ contained $L$ leaves and suppose that $\mu_{\ell}$ is the jump associated to leaf $\ell.$
+If we let $I(\ell;T_{m})$ be the set of indices $i$ corresponding to the leaf $\ell,$ we see immediately that
+\begin{equation}
+p(\bmu_{m} \vert T_{m})p(Y \vert T_{m}, \bmu_{m}, \Ecal^{-(m)}, \sigma^{2}) \propto \prod_{\ell = 1}^{L}{p(\mu_{\ell})\exp\left\{-\frac{1}{2\sigma^{2}}\sum_{i \in I(\ell;T_{m})}{\lVert \br_{i}^{(-m)} - \Phi_{i}\mu_{\ell}\rVert_{2}^{2}}\right\}}
+\end{equation}
+
+Recalling that
+$$
+p(\mu_{\ell}) = (2\pi\tau^{2})^{-\frac{D - t}{2}}\left(\lvert K_{t}\rvert^{*}\right)^{\frac{1}{2}}\exp\{-\frac{1}{2\tau^{2}}\mu_{\ell}^{\top}K_{t}\mu_{\ell}\},
+$$
+we conclude
+\begin{align}
+\begin{split}
+\label{eq:Y_mu_joint}
+p(\bY, \bmu_{m} \vert T_{m}, \Ecal_{-m}, \sigma^{2}) &\propto \prod_{\ell = 1}^{L}{\left[(2\pi\tau^{2})^{-\frac{D - t}{2}}\left(\lvert K_{t} \rvert^{*}\right)^{\frac{1}{2}}\right]} \\
+~ &\times \prod_{\ell = 1}^{L}{\int{\exp\{-\frac{1}{2}\left[\mu_{\ell}^{\top}P_{\ell}\mu_{\ell} - 2\mu_{\ell}^{\top}m_{\ell}\right]\}d\mu_{\ell}}}
+\end{split}
+\end{align}
+where
+\begin{align}
+P_{\ell} &= \tau^{-2}K_{t} + \sigma^{-2}\sum_{i \in I(\ell;T_{m})}{\Phi_{i}^{\top}\Phi_{i}} \\
+m_{\ell} &= \sigma^{-2}\sum_{i \in I(\ell;T_{m})}{\Phi_{i}^{\top}\br_{i}^{(-m)}}.
+\end{align}
+
+Integrating out $\bmu_{m}$ from Equation~\eqref{eq:Y_mu_joint}, we conclude
+\begin{align}
+\label{eq:tree_likelihood}
+p(\bY \vert T_{m}, \Ecal^{-(m)}, \sigma^{2}) &\propto \prod_{\ell = 1}^{L}{\left[(2\pi\tau^{2})^{\frac{t}{2}}\left(\lvert K_{t} \rvert^{*}\right)^{\frac{1}{2}} \times \lvert P_{\ell} \rvert^{-\frac{1}{2}}\exp\left\{\frac{1}{2}\mu_{\ell}^{\top}P_{\ell}^{-1}\mu_{\ell}\right\}\right]} 
+\end{align}
+
+We also conclude from Equation~\eqref{eq:tree_likelihood} that if $\bmu_{m} = \{\mu_{1}, \ldots, \mu_{L}\},$ then
+\begin{equation}
+\label{eq:mu_posterior}
+\mu_{\ell} \vert T_{m}, \bY, \Ecal^{-(m)}, \sigma^{2} \sim \N_{D}(P_{\ell}^{-1}m_{\ell}, P_{\ell}^{-1})
+\end{equation}
+independently for each $\ell = 1, \ldots, L.$
+
+
+\subsection{Transition probability ratios}
+
+In order to compute the ratio of transition densities $q(T \vert T^{\star})/q(T^{\star} \vert T),$ we begin by noting that if $T^{\star}$ is constructed from $T$ using a \texttt{GROW} (resp. \texttt{PRUNE}) move, then $T$ may be constructed from $T^{\star}$ using a \texttt{PRUNE} (resp. \texttt{GROW}) move. 
+
+
+
+
+In our transition kernel, we propose \texttt{GROW} and \texttt{PRUNE} moves with equal probability for trees that contain more than the root node.
+For trees containing only the root note, we only propose \texttt{GROW} moves.
+
+\skd{The transition ratios are annoying to typeset but I've worked them out and will write them up later on}
+
+\begin{comment}
+\textbf{\texttt{GROW} transitions}. Suppose first that $T^{\star}$ is constructed from $T$ using a \texttt{GROW} move.
+In order to construct $T^{\star},$ we must randomly select (i) a leaf node $\texttt{nx}$ in $T$ and (ii) a new decision rule $(v(\texttt{nx}), c(\texttt{nx})).$
+In $T^{\star},$ the node $\texttt{nx}$ has two children (\texttt{nxl} and \texttt{nxr}) but no grandchildren. 
+\end{comment}
+
+\begin{comment}
+\skd{Don't proceed beyond this point}
+In our transition kernel, we select the leaf node $\texttt{nx}$ in $T$ uniformly at random
+
+
+
+
+
+To compute the transition density, let $\texttt{PBx}$ the probability of selecting a \texttt{GROW} move given $T$ and let $\texttt{PDy}$ be the probability of selecting a \texttt{PRUNE} move given $T^{\star}.$
+
+
+To construct $T$ from $T^{\star}$
+
+We begin by computing the transition density
+
+
+
+Given the current value of the tree $T,$ let \texttt{PBx} and \texttt{PDx} be the respective probabilities of selecting a \texttt{GROW} and \texttt{PRUNE} move.
+When $T$ consists of more than the root node, we set $\texttt{PBx} = \texttt{PDx} = 0.5$ by default.
+Otherwise, if $T$ is just the root, we set $\texttt{PBx} = 1.$
+Similarly, let \texttt{PBy} and \texttt{PDy} be the respective probabilities of selecting a \texttt{GROW} and \texttt{PRUNE} transition given $T^{\star}.$
+Observe as well that if $T^{\star}$ is drawn from $q(\cdot \vert T),$ then $T$ and $T^{\star}$  
+
+Likewise, if 
+
+
+\textbf{\texttt{GROW} transitions} In a \texttt{GROW} transition, a new tree $T^{+}$ is constructed from the current tree $T$ by converting a randomly selected existing leaf node $\texttt{nx}$ in $T$ and adding two children nodes $\texttt{nxl}$ and $\texttt{nxr}$, which are then leafs in $T^{+}.$
+As part of this transition, a new decision rule $(v(\texttt{nx}), c(\texttt{nx}))$ is also drawn randomly.
+
+
+
+
+
+into a non-terminal node with two children, which themselves are new leaf nodes.
+
+
+
+\textbf{\texttt{PRUNE} transitions}
+In a \texttt{PRUNE} move, 
+
+
+For completeness, we describe the main steps in the next several subsections.
+
+
+
+\textbf{Prior tree probability ratio}. The prior probability of tree $T$ can be written as
+\begin{equation}
+\label{eq:tree_prior_decomposition}
+\pi(T) = \prod_{\text{leafs \texttt{nx}}}{(1 - \P(\text{no split at \texttt{nx}}))} \times \prod_{\text{internal \texttt{nx}}}{\left[\P(\text{split at \texttt{nx}})\times \pi(v(\texttt{nx}), c(\texttt{nx}))\right]}
+\end{equation}
+
+Suppose now that $T^{+}$ is constructed from $T$ by growing the leaf $\texttt{nx}$ into two children $\texttt{nxl}$ and $\texttt{nxr}$ and picking the decision rule $(v(\texttt{nx}), c(\texttt{nx})).$
+Observe that the structure of $T^{+}$ and $T$ is identical except for the chosen node \texttt{nx} and its children \texttt{nxl} and \texttt{nxr} in $T^{+}.$
+Let \texttt{PGnx} be the branching process probability of splitting the node \texttt{nx} in $T.$
+Also let \texttt{PGnly} and \texttt{PGry} be the branching process probabilities of splitting the nodes \texttt{nxl} and \texttt{nxr} in $T^{*}.$
+Thus, 
+\begin{align}
+\label{eq:prior_ratio_grow}
+\frac{\pi(T^{+})}{\pi(T)} &= \frac{\P(\text{split at \texttt{nx}})\P(\text{no split at \texttt{nxl}})\P(\text{no split at \texttt{nxr}})\pi(v(\texttt{nx}), c(\texttt{nx}))}{\P(\text{no split at \text{nx}})}\\
+% &= \frac{\texttt{PGnx}(1 - \texttt{PGly})(1 - \texttt{PGry})\pi(v(\texttt{nx}),c(\texttt{nx}))}{1 - \texttt{PGnx}} this is implementation formula
+\end{align}
+
+Similarly, suppose that $T^{-}$ is constructed from $T$ by collapsing two leaf nodes $\texttt{nxl'}$ and $\texttt{nxr'}$ back to their common parent $\texttt{nx}'.$
+We have
+\begin{equation}
+\label{eq:prior_ratio_prune}
+\frac{\pi(T^{-})}{\pi(T)} = \frac{\P(\text{no split at \texttt{nx}'})}{\P(\text{no split at \texttt{nxr}'})\P(\text{no split at \texttt{nxl'}})\P(\text{split at \texttt{nx'}})\pi(v(\texttt{nx'}), c(\texttt{nx'}))}
+\end{equation}
+
+\textbf{\texttt{GROW} transition probability}
+
+Observe that if $T^{\star}$ is constructed from $T$ using a GROW (resp. PRUNE) move, then we can construct $T$ from $T^{\star}$ using a PRUNE (resp. GROW) move.
+Let \texttt{PBy} and \texttt{PDy} be the probabilities of selecting GROW and PRUNE moves, respectively, given the proposal tree $T^{\star}.$
+
+In our transition kernel, we are free to specify the distribution over decision rules.
+In our derivations, we will let $q(v(\texttt{x}), c(\texttt{x}))$ denote the transition probability of a decision rule.
+To simplify the MH ratio calculation, we will take the transition distribution over decision rules to be precisely equal to the prior distribution so that $q(v(\texttt{nx}), c(\texttt{nx})) = \pi(v(\texttt{nx}), c(\texttt{nx})).$
+
+Recall that we need to pick a leaf node \texttt{nx} from $T$ and then select a decision rule $(v(\texttt{nx}),c(\texttt{nx}))$ for this node.
+Let \texttt{goodbots} be the set of leaf nodes in $T$ that can be split further.
+Then $\texttt{Pbotx} = \lvert \texttt{goodbots} \rvert^{-1}$ is the probability of drawing leaf node \texttt{nx} uniformly from the set \texttt{goodbots}.
+We thus have
+$$
+q(T^{\star} \vert T) = \texttt{PBx} \cdot \texttt{Pbotx} \cdot q(v(\texttt{nx}),c(\texttt{nx})).
+$$
+
+If we \texttt{nogy} is the set of \texttt{nog} noes in $T^{*},$ then the probability of selecting $\texttt{nx}$ uniformly from $\texttt{nogy}$ is just $\texttt{Pnogy} = \lvert \texttt{nogy} \rvert^{-1}.$
+This means that
+$$
+q(T \rightarrow T^{\star}) = \texttt{PDy} \cdot \texttt{Pnogy}.
+$$
+
+We thus have
+\begin{equation}
+\label{eq:transition_ratio_grow}
+\frac{q(T \vert T^{+})}{q(T^{\star} \vert T)} = \frac{\texttt{PDy} \cdot \texttt{Pnogy}}{\texttt{PBx} \cdot \texttt{Pbotx} \cdot q(v(\texttt{nx}),c(\texttt{nx}))}
+\end{equation}
+
+
+
+\textbf{\texttt{PRUNE} transition probability}
+
+To construct $T^{*}$ from $T,$ the kernel must first choose to perform a PRUNE move with probability and then must uniformly select a \texttt{nog} node from $T$.
+The probability of choosing a PRUNE move given $T$ is \texttt{PDx}.
+If \texttt{nogx} is the set of \texttt{nog} nodes in $T,$ then probability of selecting \texttt{nx} is $\texttt{Pnogx} = \lvert\texttt{nogx}\rvert^{-1}.$
+Therefore
+$$
+q(T \rightarrow T^{*}) = \texttt{PDx} \cdot \texttt{Pnogx}.
+$$
+
+To construct $T$ from $T^{*},$ the kernel must first select a GROW move, then select a bottom node to split, and finally select a decision rule $(v(\texttt{nx}), c(\texttt{nx})).$
+Let the probability of choosing a GROW move given $T^{*}$ be \texttt{PBy}.
+Let $\texttt{ngood}$ be the total number of bottom nodes in $T^{*}$ that can be split further and let $\texttt{Pboty} = \texttt{ngood}^{-1}.$
+
+Note, in our implementation, before we check whether we are performing a GROW or PRUNE move, we run the function \textbf{\texttt{getpb}} on the tree $T.$
+Among other things, this function populates \texttt{goodbots}, the set of bottom nodes which can be split in $T.$
+In implementing a PRUNE move, we initialize $\texttt{ngood} = \lvert \texttt{goodbots} \rvert.$
+Then we check whether the left and right child of \texttt{nx} (\texttt{nxl} and \texttt{nxr}, respectively) are elements of \texttt{goodbots}.
+If either of \texttt{nxl} or \texttt{nxr} are elements of \texttt{goodbots}, then we decrement \texttt{ngood} appropriately.
+We finally add one to \texttt{ngood} to account for the fact that \texttt{nx} is a bottom node in $T^{*}$ that can be further split.
+Having picking $\texttt{nx},$ it remains to pick a decision rule, which has probability $q(v(\texttt{nx}), c(\texttt{nx})).$
+Thus, 
+$$
+q(T^{*} \rightarrow T) = \texttt{PBy} \cdot \texttt{Pboty} \cdot q(v(\texttt{nx}), c(\texttt{nx})).
+$$
+The transition ratio for a PRUNE move is therefore
+\begin{equation}
+\label{eq:transition_ratio_prune}
+\frac{q(T^{*} \rightarrow T)}{q(T \rightarrow T^{*})} = \frac{\texttt{PBy} \cdot \texttt{Pboty} \cdot q(v(\texttt{nx}), c(\texttt{nx}))}{\texttt{PDx} \cdot \texttt{Pnogx}}
+\end{equation}
+
+\textbf{Summary}
+\textbf{Evaluating the decision tree prior}. 
+
+where $\P(\text{split at $\eta$}) = 0.95(1 + d(\eta))^{-2}$ where $d(\eta)$ is the depth of node $\eta.$
+The first two products in~\eqref{eq:tree_prior_decomposition} correspond to the branching process that determines the tree structure.
+The third product is the prior probability of the decision rules associated with all of the internal nodes of $T.$
+ 
+\textbf{Transition kernel}. 
+
+In a GROW move, we select a leaf node \texttt{nx} uniformly from $T$ and then pick a decision rule $(v(\texttt{nx}), c(\texttt{nx}))$ with which to separate the observations associated with  with \texttt{nx} into a left and right child, which we respectively denote \texttt{nxl} and \texttt{nxr}.
+In a PRUNE move, we uniformly select a node \texttt{nx} with no grandchildren (a \texttt{nog}) node and collapse its children, \texttt{nxl} and \texttt{nxr}, back into \texttt{nx}.
+
+Suppose that $T^{\star}$ is constructed from $T$ using a \texttt{GROW} move.
+We begin by computing the transition probability$q(T^{\star} \vert T).$
+Recall that we need to pick a leaf node \texttt{nx} from $T$ and then select a decision rule $(v(\texttt{nx}),c(\texttt{nx}))$ for this node.
+Let \texttt{goodbots} be the set of leaf nodes in $T$ that can be split further.
+Then $\texttt{Pbotx} = \lvert \texttt{goodbots} \rvert^{-1}$ is the probability of drawing leaf node \texttt{nx} uniformly from the set \texttt{goodbots}.
+We thus have
+$$
+q(T \rightarrow T^{*}) = \texttt{PBx} \cdot \texttt{Pbotx} \cdot q(v(\texttt{nx}),c(\texttt{nx})).
+$$
+
+If we \texttt{nogy} is the set of \texttt{nog} noes in $T^{*},$ then the probability of selecting $\texttt{nx}$ uniformly from $\texttt{nogy}$ is just $\texttt{Pnogy} = \lvert \texttt{nogy} \rvert^{-1}.$
+This means that
+$$
+q(T^{*} \rightarrow T) = \texttt{PDy} \cdot \texttt{Pnogy}.
+$$
+
+
+We thus have
+\begin{equation}
+\label{eq:transition_ratio_grow}
+\frac{q(T^{*} \rightarrow T)}{q(T \rightarrow T^{*})} = \frac{\texttt{PDy} \cdot \texttt{Pnogy}}{\texttt{PBx} \cdot \texttt{Pbotx} \cdot q(v(\texttt{nx}),c(\texttt{nx}))}
+\end{equation}
+
+
+\textbf{Prior Ratio.} 
+Observe that the structure of $T^{*}$ and $T$ is identical except for the chosen node \texttt{nx} and its children \texttt{nxl} and \texttt{nxr} in $T^{*}.$
+Let \texttt{PGnx} be the branching process probability of splitting the node \texttt{nx} in $T.$
+Also let \texttt{PGnly} and \texttt{PGry} be the branching process probabilities of splitting the nodes \texttt{nxl} and \texttt{nxr} in $T^{*}.$
+Then
+\begin{equation}
+\label{eq:prior_ratio_grow}
+\frac{\pi(T^{*})}{\pi(T)} = \frac{\texttt{PGnx}(1 - \texttt{PGly})(1 - \texttt{PGry})\pi(v(\texttt{nx}),c(\texttt{nx}))}{1 - \texttt{PGnx}}
+\end{equation}
+
+Putting together Equations~\eqref{eq:transition_ratio_grow} and~\eqref{eq:prior_ratio_grow}, we have
+\begin{align}
+\begin{split}
+\label{eq:alpha_grow_full}
+\alpha(T \rightarrow T^{*}) &= \frac{p(Y \mid T^{*})}{p(Y \mid T)}\times \frac{\pi(v(\texttt{nx}), c(\texttt{nx}))}{q(v(\texttt{nx}), c(\texttt{nx}))} \\
+~&\times \frac{\texttt{PGnx}\cdot (1 - \texttt{PGly})\cdot (1 - \texttt{PGry})\cdot \texttt{PDy}\cdot\texttt{Pnogy}}{(1 - \texttt{PGnx})\cdot \texttt{PBx}\cdot \texttt{Pbotx}}
+\end{split}
+\end{align}
+
+
+
+
+Given the current value of the tree $T,$ let \texttt{PBx} and \texttt{PDx} be the respective probabilities of selecting a GROW and PRUNE move.
+When $T$ consists of more than the root note, we set $\texttt{PBx} = \texttt{PDx} = 0.5$ by default.
+Suppose that $T^{*}$ is constructed from $T$ using a \texttt{GROW} transition.
+Note that $T$ can be obtained from $T^{*}$ using a \texttt{PRUNE} move.
+Let $\texttt{PDy}$ be the probability of selecting a \texttt{PRUNE} move 
+
+
+Observe that if $T^{*}$ is constructed from $T$ using a GROW (resp. PRUNE) move, then we can construct $T$ from $T^{*}$ using a PRUNE (resp. GROW) move.
+
+
+
+Let \texttt{PBy} and \texttt{PDy} be the probabilities of selecting GROW and PRUNE moves, respectively, given the proposal tree $T^{*}.$
+
+\texitt{GROW transitions}. We begin by computing 
+
+
+
+\textbf{Transition kernel}. We use a simplified version of \citet{Chipman1998}'s transition kernel, restricting ourselves to \texttt{GROW} and \texttt{PRUNE} transitions.
+That is, the new tree $T^{\text{new}}$ can be obtained from $T^{\text{old}}$ by either (i) splitting an existing leaf into two additional children or (ii) collapsing two existing leafs with a common parent back to the common parent node.
+In our kernel, \texttt{GROW} and \texttt{PRUNE} moves are proposed with equal probability, except when $T^{\text{old}}$ is the root node, in which case we always propose a \texttt{GROW} move.
+We moreover choose our transition kernel to ensure considerable cancellation in the acceptance ratio in Equation~\eqref{eq:mh_ratio}.
+
+
+
+
+
+
+
+\skd{Will include more details here}
+
+\textbf{Computing the marginal likelihood of $T$}
+A key quantity in Equation~\eqref{eq:mh_ratio} is the marginal likelihood $p(\bY \vert T, \Ecal_{-m}, \sigma).$
+Observe that the likelihood of the $m^{\text{th}}$ regression tree can be written as
+$$
+p(\bY \vert T, \bmu, \Ecal_{-m}, \sigma) = \prod_{i = 1}^{n}{(2\pi\sigma^{2})^{-\frac{n_{i}}{2}}\exp\{-\frac{1}{2\sigma^{2}}\lVert \br_{i} - \Phi_{i}g(\bz_{i}; T, \bmu)\rVert_{2}^{2}\}}
+$$
+where $\br_{1}, \ldots, \br_{n}$ are the vectors of \textit{partial residuals} given by
+$$
+\br_{i} = \by_{i} - \Phi_{i}\sum_{m' \neq m}{g(\bz_{i}; T_{m'}, \bmu_{m'})}.
+$$
+For notational compactness, we have suppressed the dependence on the index $m$ from our notation for the partial residuals.
+
+Now if we let $I(\ell;T)$ denote the set of observation indices associated with the leaf $\ell$ in tree $T,$ 
+
+
+Before describing the update of a single tree $(T_{m}, \bmu_{m}),$ we need some additional notation.
+First, let $\Ecal_{-}$ be the collection of all of the remaining $M-1$ trees, where, for notational compactness, we suppress the dependence on $m$.
+Further, define the $n$ partial residual vectors $\br_{1}, \ldots, \br_{n}$ as
+$$
+\br_{i} = \by_{i} - \Phi_{i}\sum_{m' \neq m}{g(\bz_{i}; T_{m}, \bmu_{m})}.
+$$
+Additionally, for an arbitrary tree $T,$ let $I(\ell;T)$ be the observation indices $i$ associated with leaf $\ell.$
+
+Observe that for each $i = 1, \ldots, n,$ the contribution to the overall likelihood in Equation~\eqref{eq:likelihood} can be written
+\begin{align}
+p(\by_{i} \vert T, \bmu, \Ecal_{-}, \sigma^{2}) &= \exp\{-\frac{1}{2\sigma^{2}}\lVert \br_{i} - \Phi_{i}g(\bz_{i}; T, \bmu)\rVert\} \\
+&= \prod_{\ell = 1}^{L(T)}{\exp\{-\frac{1}{2\sigma^{2}}\lVert \br_{i} - \Phi_{i}\mu_{\ell}\rVert_{2}^{2}\}}
+\end{align}
+
+We therefore have
+\begin{equation}
+\label{eq:joint_tree_density}
+p(T, \mu_{\ell} \vert \bY, \Ecal_{-}) \propto p(T)\prod_{\ell = 1}^{L}{\left(2\pi\tau^{2}\right)^{-\frac{(D-1)}{2}}\left(\lvert K_{1}\rvert^{*}\right)^{\frac{1}{2}}\exp\{-\frac{1}{2}\left[\mu_{\ell}^{\top}P_{\ell}\mu_{\ell} - 2\mu_{\ell}^{\top}m_{\ell}\right]\}}
+\end{equation}
+
+where
+\begin{align}
+P_{\ell} &= \tau^{-2}K_{1} + \sigma^{-2}\sum_{i \in I(\ell;T)}{\Phi_{i}^{\top}\Phi_{i}} \\
+m_{\ell} &= \sigma^{-2}\sum_{i \in I(\ell;T)}{\Phi_{i}^{\top}\br_{i}}
+\end{align}
+
+From Equation~\eqref{eq:joint_tree_density}, we immediately conclude that conditional on the tree $T$ the jumps $\mu_{1}, \ldots, \mu_{L}$ are independent and $\mu_{\ell} \sim \N_{D}(P_{\ell}^{-1}m_{\ell}, P_{\ell}^{-1}).$ \footnote{\skd{This requires the matrix $P_{\ell}$ to be positive definite}}
+
+Moreover, integrating out $\mu_{\ell}$ from Equation~\eqref{eq:joint_tree_density}, we have
+\begin{equation}
+\label{eq:conditional_tree_density}
+p(T \vert \bY, \Ecal_{-}) \propto p(T)\prod_{\ell = 1}^{L}{(2\pi)^{\frac{1}{2}}(\tau^{2})^{-\frac{D-1}{2}}\left(\lvert K_{1}\rvert^{*}\right)^{\frac{1}{2}}\lvert P_{\ell} \rvert^{-\frac{1}{2}}\exp\{\frac{1}{2}m_{\ell}^{\top}P_{\ell}^{-1}m_{\ell}\}}
+\end{equation}
+
+Note, in our implementation, the function \texttt{compute\_lil} returns the quantity
+$$
+-\frac{1}{2}\log\left(\lvert P_{\ell} \rvert\right) + \frac{1}{2}m_{\ell}^{\top}P_{\ell}^{-1}m_{\ell}.
+$$
+This is used in computing the Metropolis-Hastings ratio for 
+
+
+\subsection{Implementation tricks}
+
+\textbf{Avoiding matrix inversions}.
+To compute the MH acceptance ratio, we have to evaluate $m_{\ell}^{\top}P_{\ell}^{-1}m_{\ell}$ for multiple leaves across multiple trees.
+Rather than performing a matrix inversion followed by two matrix-vector multiplications, we instead use the following steps
+\begin{enumerate}
+\item{Compute the lower Cholesky decomposition $P_{\ell} = L_{\ell}L_{\ell}^{\top}$}
+\item{Solve the linear system $L_{\ell}\nu = m_{\ell}$}
+\item{Compute $\nu^{\top}\nu.$}
+\end{enumerate}
+
+Since $P_{\ell} = L_{\ell}L_{\ell}^{\top},$ we know that $P_{\ell}^{-1} = (L_{\ell}^{\top})^{-1}L_{\ell}^{-1} = (L_{\ell}^{-1})^{\top}L_{\ell}^{-1}.$
+
+Observe that $\nu = L_{\ell}^{-1}m_{\ell}$ so 
+$$
+\nu^{\top}\nu = m_{\ell}^{\top}(L_{\ell}^{-1})^{\top}L_{\ell}^{-1}m_{\ell} = m_{\ell}^{\top}P_{\ell}^{-1}m_{\ell}.
+$$
+Solving the system $L_{\ell}\nu = m_{\ell}$ can be done quickly via back-substitution. 
+A fast implementation of this is provided by \texttt{arma::solve(arma::trimatl(L), m)}, which exploits the fact that $L_{\ell}$ is lower triangular.
+
+Additionally, we have to sample from a $\N(P_{\ell}^{-1}m_{\ell}, P_{\ell}^{-1})$ distribution.
+We do this by
+\begin{enumerate}
+\item{Compute the lower Cholesky decomposition $P_{\ell} = L_{\ell}L_{\ell}^{\top}$}
+\item{Sample $\tilde{\epsilon} \sim \N(0, I_{D}).$}
+\item{Solve $L_{\ell}^{\top}\epsilon = \tilde{\epsilon}$}
+\item{Solve $L_{\ell}\nu = m_{\ell}$}
+\item{Solve $L_{\ell}^{\top}\mu = \nu$}
+\item{Return $\mu + \epsilon$}
+\end{enumerate}
+
+Note that $\epsilon = (L_{\ell}^{\top})^{-1}\tilde{\epsilon}.$
+Using the fact that $\left((L_{\ell}^{\top})^{-1}\right)^{\top} = L_{\ell}^{-1},$ we have $\epsilon \sim \N(0, (L_{\ell}^{\top})^{-1}L_{\ell}^{-1}).$
+Likewise, we see $\mu = (L^{\top})^{-1}L^{-1}m_{\ell}$
+
+
+\end{comment}
+
+
+
+% generalized determinant is just the product of the non-zero eigenvalues
+% http://www.math.chalmers.se/~bodavid/GMRF2015/Lectures/F5slides.pdf

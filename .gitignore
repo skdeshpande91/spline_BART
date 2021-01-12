@@ -1,0 +1,13 @@
+*.tar.gz
+*.Rhistory
+*.Rapp.history
+data/*.RData
+*.o
+writing/*.aux
+writing/*.log
+writing/*.out
+writing/*snyctex.gz
+writing/*.blg
+writing/*.pdf
+
+

@@ -1,0 +1,70 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, amsthm, float, fullpage, graphicx, multirow,parskip, subcaption, setspace}
+\usepackage{comment}
+\usepackage{url}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{bm, bbm}
+\usetikzlibrary{shapes.geometric, positioning}
+\usetikzlibrary{quotes, angles}
+\usepackage{rotating}
+\usepackage{hyperref}
+\usepackage{natbib}
+
+\definecolor{SkyBlue}{RGB}{14, 118, 188}
+\definecolor{BrightRed}{RGB}{223,82, 78}
+
+
+\hypersetup{pdfborder = {0 0 0.5 [3 3]}, colorlinks = true, linkcolor = BrightRed, citecolor = SkyBlue}
+
+\bibliographystyle{apalike}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
+
+
+\newcommand{\numbereqn}{\addtocounter{equation}{1}\tag{\theequation}} % use \numberthis to add number in align* mode
+
+\newcommand{\skd}[1]{\textcolor{cyan}{\small [skd]: #1}}
+
+\onehalfspacing
+\begin{document}
+
+\def\by{\bm{y}} % for single surface's observations
+\def\bY{\bm{Y}} % for all observations across all surfaces
+
+\def\bz{\bm{z}} % for single surface's profile vector
+\def\bmu{\boldsymbol{\mu}}
+\def\br{\bm{r}}
+
+
+\def\bphi{\boldsymbol{\varphi}}
+\def\bbeta{\boldsymbol{\beta}}
+
+\def\Ecal{\mathcal{E}}
+\def\R{\mathbb{R}}
+\def\N{\mathcal{N}}
+\def\P{\mathbb{P}}
+
+
+\section{Introduction}
+
+\input{introduction}
+
+\section{Background}
+\input{background}
+
+\section{Proposed method}
+\input{methods}
+
+\newpage
+\bibliography{bart_splines}
+
+\newpage
+\appendix
+\section{Tedious Calculations}
+\input{calculations}
+
+\end{document}

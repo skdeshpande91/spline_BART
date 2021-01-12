@@ -1,0 +1,107 @@
+%!TEX root = splineBART_main.tex
+
+\subsection{The P splines regression model.}
+\citet{EilersMarx1996} introduced penalized splines (P-splines) for curve fitting.
+Given data $(x_{i}, y_{i})$ they proposed solving
+\begin{equation}
+\label{eq:p_splines_penalty}
+\hat{\beta}_{\lambda,t} = \argmin_{\beta \in \R^{D}}\left\{\left\lVert \by - \Phi(X)\beta \right\rVert_{2}^{2} + \lambda\left\lVert \Delta_{t}\beta \right\rVert^{2} \right\}
+\end{equation}
+where $\Phi(X)$ is an $n \times D$ matrix whose columns are the evaluations of $D$ B-splines functions and $\Delta_{t}$ is the $t^{\text{th}}$ difference operator.
+The penalty ensures that the spline function is not too ``wiggly.''
+
+Typically practitioners use $t = 1$ or $t = 2$ and we can represent $\Delta_{t}$ with a $(D - t) \times D$ matrix.
+For instance
+$$
+\Delta_{1} = 
+\begin{pmatrix}
+-1 & 1 & 0 & 0 &  \cdots\\
+0 & -1 & 1 & 0 & \cdots \\
+\vdots & ~ &  ~ & ~ &  \vdots \\
+0 & \cdots & 0 & -1 & 1 
+\end{pmatrix}
+$$
+
+
+\citet{LangBrezger2004} noted that the penalty in Equation~\eqref{eq:p_splines_penalty} is, up to an additive constant, equal to the log-density of a $t^{\text{th}}$-order Intrinsic Gaussian Markov Random Field (IGMRF; \citet{RueHeld2005}) with ``precision'' matrix $K_{t} = \Delta_{t}^{\top}\Delta_{t}.$
+They fit the following model
+\begin{align}
+p(\by \vert \beta, \sigma^{2}) &\propto (\sigma^{2})^{\frac{-n_{i}}{2}}\exp\{-\frac{1}{2\sigma^{2}}\Vert \by - \Phi\beta \rVert_{2}^{2}\} \\
+p(\beta) &\propto (2\pi\tau^{2})^{-\frac{D - t}{2}}\left(\left\lvert K_{t} \right\rvert^{*}\right)^{\frac{1}{2}}\exp\{-\frac{1}{2\tau^{2}}\beta^{\top}K_{t}\beta\}
+\end{align}
+where $\lvert \cdot \rvert^{*}$ is the \textit{generalized determinant}, defined to the product of the non-zero eigenvalues \citep{RueHeld2005}.
+
+\subsection{Bayesian treed regression.}
+To set our notation, let $T$ be a binary decision tree partitioning $\R^{p}$ that consists of a collection of interior nodes and $L(T)$ terminal or \emph{leaf} nodes.
+We associate each internal (i.e. non-leaf) node $\eta$ of $T$ with an axis-aligned decision rule that is determined by a pair $(v(\eta),c(\eta))$ of a splitting variable index $v(\eta) \in \{1, \ldots, p\}$ and cutpoint $c(\eta) \in \R.$
+
+For any $\bz \in \R^{p}$, we can sketch a path from the root node to a single leaf node as follows.
+Starting from the root node, at an internal node with decision rule $(v,c),$ we proceed to the left child if $z_{v} < c$ and we proceed to the right child if $z_{v} \geq c.$
+In this way, the tree $T$ partitions $\R^{p}$ into $L(T)$ rectangular cells, with each cell corresponding to a single leaf node.
+We let $\ell(\bz;T)$ be the function that returns the index of the leaf containing the point $\bz.$
+
+A \emph{regression tree} is a pair $(T, \bmu)$ consisting of a decision tree $T$ and a collection of \emph{jumps} $\bmu = \{\mu_{1}, \ldots, \mu_{L(T)}\}$ associated with each leaf of $T.$
+For our purposes, we will assume that the individual jumps are vector-valued (i.e. $\mu_{\ell} \in \R^{D}$).
+The evaluation function $g(\bz; T,\bmu) = \mu_{\ell(\bz;T)}$ returns the jump corresponding to the leaf containing the point $\bz.$
+In other words, the function $g(\bz;T,\bmu)$ is a piecewise-constant step function mapping $\R^{p}$ to $\R^{D}.$
+
+
+\citet{Chipman2010} introduced Bayesian Additive Regression Trees (BART) for univariate nonparametric regression.
+The main thrust of BART is to approximate unknown regression functions with a sum of regression trees.
+Priors over the regression trees are then updated to form a posterior distribution over the regression function.
+
+In the decade since its introduction, the basic BART model has been extended successfully to survival analysis \citep{Sparapani2016}, multiple imputation \citep{Xu2016}, log-linear models \citep{Murray2019}, semi-continuous responses \citep{Linero2019}, causal inference \citep{Hill2011, Hahn2020}, and varying coefficient models \citep{Deshpande2020}.
+BART has also been modified to recover smooth \citep{LineroYang2018, Starling2019} and monotonic \citep{Chipman2019, Starling2020} functions.
+In each of these settings, new BART-based methods often substantially outperform existing state-of-the-art procedures in terms of function recovery and prediction.
+Moreover, recent results in \citet{Rockova2019} and \citet{RockovaSaha2019} demonstrate BART's theoretical near-optimality under very mild assumptions. 
+We refer the reader to \citet{Tan2019} and \citet{Hill2020} for a more detailed reviews of BART and its many extensions.
+
+From a practitioners standpoint, a large part of BART's appeal is the existence of a default prior specification that delivers remarkably good predictive performance ``off-the-shelf'' with little to no hyperparameter tuning.
+Building on \citet{Chipman1998}, \citet{Chipman2010} specify the regression tree prior two parts, a prior over the decision tree and independent normal priors over the jumps conditional on the tree structure.
+
+\textbf{Decision tree prior}. \citet{Chipman1998}'s decision tree prior can be described with a branching process.
+To sample from the prior, starting from the root node, one first randomly decides whether or not to continue growing the tree from each of the current leaves. 
+Conditional on growing the tree from $\eta$, we first draw the new split variable index $v(\eta)$ and then drawn the cutpoint $c(\eta)$ conditionally on $v(\eta).$
+
+In the branching process, the probability that a node at depth $d$ is non-terminal is $0.95(1 + d)^{-2}.$
+This ensures that the prior places overwhelming probability on trees of depth five or less.
+
+
+Whereas \citet{Chipman2010} set each $\theta_{j} = 1/p,$ we follow \citet{Linero2018} and attempt to learn the split probabilities from the data.
+Specifically, we place a $\text{Dirichlet}(\alpha/p, \ldots, \alpha/p)$ prior on $\theta.$
+We complete our prior specification with a discrete prior over $u_{j} = \alpha_{j}/(R + \alpha_{j})$ where
+$$
+p(u = u_{t}) \propto (u_{t})^{a-1}(1 - u_{t})^{b-1}
+$$
+where $\{u_{1}, \ldots, u_{N}\}$ is a pre-specified grid of values in $[0,1].$
+
+Conditionally on $v(\eta) = j,$ we select $c(\eta)$ uniformly from the set of non-trivial cutpoints.
+Recall that a cutpoint is \textit{trivial} if it leads to a decision rule that contradicts a decision rule higher in the tree.
+For instance, the rule $\{Z_{1} \leq 2 \}$ would be trivial at $\eta$ if an ancestor of $\eta$ is associated with the rule $\{Z_{1} \leq 1\}.$
+If there are no non-trivial cutpoints at $\eta$, we select $c(\eta)$ uniformly from the set of \textit{all} available cutpoints for variable $Z_{v(\eta)}.$ 
+This is the ``Assumption 2'' prior introduced in \citet{Linero2018}.
+
+After we update each tree in $\mathcal{E}_{j},$ we can use a conjugate update of $\theta_{j}$:
+$$
+\theta_{j} \mid \mathcal{E}_{j} \sim \text{Dirichlet}(\alpha_{j}/R + s_{j1}, \ldots, \alpha_{j}/R + s_{jR}).
+$$
+
+The posterior mass function on $\alpha_{j}$ is given by
+\begin{align}
+\begin{split}
+p(\alpha_{j} = \alpha_{j}^{(t)} \mid \theta_{j}, \ldots) &\propto \frac{\Gamma(\alpha^{(t)}_{j})}{\Gamma(\alpha^{(t)}/R)^{R}} \times \left(\prod_{r = 1}^{R}{\theta_{jr}}\right)^{\alpha_{j}^{(t)}/R} \\
+&\times \frac{1}{R}\left(\frac{\alpha_{j}^{(t)}}{\alpha_{j}^{(t)} + R}\right)^{a-1}\left(\frac{R}{\alpha_{j}^{(t)} + R}\right)^{b+1}
+\end{split}
+\end{align}
+
+We will restrict $u^{(t)} = t/N_{u}$ for $t = 1, \ldots, N_{u} - 1$ where $N_{u}$ is a parameter passed by the user.
+
+\textbf{Treed spline regression}.
+\citet{Low-Kam2015} proposed approximating $\bbeta(\bz)$ with a single regression tree $(T,\bmu).$
+They specified a prior over the unknown regression tree in two parts: (i) a prior on the decision tree $T$ and (ii) a conditional prior on the corresponding jumps $\bmu \vert T.$
+They used \citet{Chipman1998}'s brancing process prior for the decision tree and a modified IGMRF of order 1 on the jumps.
+To ensure prior propriety, they added a jitter $\eta$ to the first and last diagonal elements of the IGMRF ``precision'' matrix $K_{1} = \Delta_{1}^{\top}\Delta_{1}.$
+They then described a Markov Chain Monte Carlo (MCMC) simulation to approximate draws from the posterior distribution $p(T, \bmu, \sigma^{2} \vert \bY).$
+
+In the context of our boiling data, the tree $T$ partitions the surfaces according to the covariates $\bz.$
+Then we fit a separate Bayesian P-splines model in each leaf.

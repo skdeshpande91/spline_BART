@@ -1,0 +1,92 @@
+%!TEX root = splineBART_main.tex
+We propose a very minor extension of \citet{Low-Kam2015}'s procedure: rather than approximating $\bbeta(\bz)$ with a single regression tree, we instead approximate it with a sum of $M$ regression trees:
+$$
+\bbeta(\bz) \approx \sum_{m = 1}^{M}{g(\bz; T_{m}, \bmu_{m})}.
+$$
+We use virtually the same priors as \citet{Low-Kam2015} except we do not add the jitter to the IGMRF ``precision'' matrix in the conditional jump prior and we scale the conditional jump prior so that no individual tree explains too much variability in $\bbeta.$
+
+More explicitly, we place an improper prior with density
+$$
+p(\mu \vert \tau^{2}) = \left(2\pi\tau^{2}\right)^{-\frac{D-1}{2}}\left(\lvert K_{1}\rvert\right)^{\frac{1}{2}}\exp\{-\frac{1}{2\tau^{2}}\mu^{\top}K_{1}\mu\}
+$$ 
+on each jump.
+
+If we let $\Ecal = \{(T_{m}, \bmu_{m})\}_{m = 1}^{M}$ be the entire ensemble of regression trees, our data likelihood is given by
+\begin{equation}
+\label{eq:likelihood}
+p(\bY \vert \sigma^{2}, \Ecal) \propto \prod_{i = 1}^{n}{\left(\sigma^{2}\right)^{-\frac{n_{i}}{2}}\exp\left\{-\frac{1}{2\sigma^{2}}\lVert \by_{i} - \Phi_{i}\sum_{m = 1}^{M}{g(\bz_{i};T_{m}, \bmu_{m})}\rVert_{2}^{2}\right\}}
+\end{equation}
+We use a Gibbs sampler to draw approximate samples from the posterior distribution $p(\Ecal, \sigma^{2} \vert \bY).$
+At a high-level, our Gibbs sampler sequentially updates each regression tree $(T_{m}, \bmu_{m})$ while keeping the remaining $M-1$ trees fixed.
+
+
+%\skd{Note: \citet{Low-Kam2015} use a first-order random walk prior on the splines coefficients. They then modify the diagonal to make it positive definit}
+% check out slide 27 for more details of 2nd order differences: https://people.stat.sc.edu/hansont/stat740/Pspline.pdf
+ 
+
+
+
+%Following \citet{Low-Kam2015}, we place a modified second-order intrinsic Gaussian Markov Random Field (IGMRF; \citet{RueHeld2005}) on the leaf vector $\mu_{\ell}$ with density
+
+%$$
+%p(\mu_{\ell} \vert \ldots) \propto \exp\{-\frac{1}{2\tau^{2}}\mu_{\ell}^{\top}K\mu_{\ell}\right\}
+%$$
+%Sampling algorithm \citep{LangBrezger2004}: (1) compute Cholesky decomposition $V_{\ell}^{-1} = LL^{\top}$ (ii) $\tilde{\beta} = (L')^{-1}z$ (solve $L^{\top}\beta = z, z \sim \N(0,I)$); (iii) compute mean by solving $V_{\ell}^{-1}
+%where we replace the first and last element of the diagonal with $1 + \eta$ for some small constant $\eta.$
+%Conditionally on $T$ we pla
+
+\begin{comment}
+Suppose for the moment that we observed data for only a single surface.
+Conventionally, boiling curves are fit using piece-wise polynomial models.
+A somewhat more flexible, but conceptually similar, approach would be to represent $F$ is a sufficiently flexible spline basis.
+
+Following \citet{EilersMarx1996}, we approximate $F$ by a spline of degree $q$ with $K$ equally spaced knots $x_{1} = \xi_{0} < \xi_{1} < \cdots < \xi_{K} = x_{n}.$
+Such a spline can be written in terms of $D = q + K$ B-spline basis functions:
+$$
+F(x) = \sum_{k = 1}^{K}{\beta_{d}\phi_{k}(x)}
+$$
+
+The spline functions $\phi_{k}$ are defined locally, in the sense that they are non-zero only on a domain spanned by $2 + q$ knots.
+
+\citet{EilersMarx199} suggest specifying a moderately large number of knots and estimate the resulting coefficient vector $\bbeta$ by solving a penalized likelihood problem.
+To ensure a fit of sufficient smoothness, they penalize a difference operator.
+Their penalty 
+
+In a Bayesian setting \citet{LangBrezger2004} 
+
+That is, suppose $\phi_{1}(x), \ldots, \phi_{D}(x)$ are B-splines of order $q$ defined over $K$ pre-determined knots (conventionally $D =  q + K$; see \citet{EilersMarx1996}, for instance).
+Then we can write
+$$
+y_{it} = \beta_{1}\phi_{1}(x_{it}) + \cdots + \beta_{D}\phi_{D}(x_{it}) + \sigma \varepsilon.
+$$
+If the number of knots $K$ is quite large, one typically selects a prior for the covariate vector $\bbeta = (\beta_{1},\ldots, \beta_{p})^{\top}$ which penalizes neighboring second differences.
+
+
+
+While there are many ways to model the underlying boiling curve, 
+
+
+
+
+one reasonable approach is with P splines \citep{EilersMarx1996}.
+From a Bayesian perspective, such an analysis would proceed as follows.
+We first specify a large number $K$ of knots and construct a collection of B-spline functions of order $q$ 
+
+% paraphrasing from Eilers and Marx:
+% q+1 polynomial pieces each of degree $q$
+% polynomial pieces join at the q inner knots
+% at the joining points, the derivatives up to order q-1 are continuous
+% B splin is positive on a domain spanned by q+2 knots, everywhere else it is zero
+% except at boundaries, it overlaps with 2q polynomial pieces of its neights
+% at a given x, q+1 B-splines are non-zero
+
+% Suppose domain of X is divided into $n'$ equal intervals by $n' + 1$ knots
+% Each interval will be covered by q+1 B-splines of degree q.
+% The total number of knots used to construct the B-splines is n' + 2q + 1
+% The number of B-splines in the regression is n = n' + q
+
+From a Bayesian perspective, such an analysis might proceed as follows: let $\phi_{1}(x), \ldots, \phi_{K}(x)$ be a B splines basis 
+
+If we only observed data for a single surface, a natural way to model the boiling curve is with penalized splines.
+That
+\end{comment}

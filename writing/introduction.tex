@@ -1,0 +1,26 @@
+%!TEX root = splineBART_main.tex
+For each of $i = 1, \ldots, n$ surfaces, we observe (i) a vector of surface parameters $\bz_{i}$ and (ii) $n_{i}$ pairs of wall superheat -- flux  $(x_{i1}, y_{i1}), \ldots (x_{in_{i}}, y_{in_{i}}).$
+At a high level, we model
+$$
+y_{it} = F(x_{it}; \bz_{i}) + \sigma \varepsilon_{it}; \quad \varepsilon_{it} \sim \N(0,1).
+$$
+Our main interest is predicting the \textit{boiling curve} as a function of the surface parameters $\bz_{i},$ which include both the sandblasting parameters and local surface roughness measurements.
+That is, we would like to estimate the entire curve $F(\cdot ; \bz)$ for each $\bz.$
+
+To this end, we approximate $F(\cdot, \bz)$ using a linear combination of $D$ pre-specified basis functions $\varphi_{1}(\cdot), \ldots, \varphi_{D}(\cdot).$
+For each $x$ in the range of observable wall superheats, let $\bphi(x)^{\top} = (\varphi_{1}(x), \ldots, \varphi_{D}(x))$ be the vector of all basis function evaluations at $x.$
+We adopt a \textit{varying coefficient} model for the boiling curve $F(\cdot, \bz)$:
+\begin{equation}
+\label{eq:varying_coef_spline}
+F(x; \bz) = \bphi(x)^{\top}\bbeta(\bz)
+\end{equation}
+
+In other words, if we let $\Phi_{i}$ be the $n_{i} \times D$ whose $t^{\text{th}}$ row is $\bphi(x_{it})^{\top},$ then we are modeling
+$$
+\by_{i} \sim \N_{n_{i}}\left(\Phi_{i}\bbeta(\bz_{i}), \sigma^{2}I_{n_{i}}\right),
+$$
+independently for all $i = 1, \ldots, n.$
+
+In light of our working model in Equation~\eqref{eq:varying_coef_spline}, our main goal is to estimate the vector-valued function $\bbeta(\bz).$
+In this note, we develop a new method based that extends \citet{Chipman2010}'s Bayesian Additive Regression Trees (BART) framework to this setting.
+The proposed method can also be seen as a natural extension of \citet{Low-Kam2015}'s single tree model.
