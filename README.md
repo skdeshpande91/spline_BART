@@ -14,7 +14,6 @@ The directory `test` contains some scripts used for testing and development.
 
 Right now the main fitting function has been written.
 There is a small test (takes ~3 minutes to run 1250 iterations w/ 200 trees, which is decidedly overkill for this problem).
-The function recovery looks something like this.
+The function recovery is in the file `writing/figures/curve_recovery.png`
 
-[!Alt text](writing/figures/curve_recovery.png$raw=true)
 
