@@ -6,7 +6,7 @@ data/*.RData
 writing/*.aux
 writing/*.log
 writing/*.out
-writing/*snyctex.gz
+writing/*synctex.gz
 writing/*.blg
 writing/*.pdf
 
