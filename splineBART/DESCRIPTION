@@ -1,0 +1,11 @@
+Package: splineBART
+Type: Package
+Title: Sum-of-treed splines with BART
+Version: 0.1
+Date: 2021-01-29
+Author: Sameer K. Deshpande
+Maintainer: Questions and comments to  <sameerd@alum.mit.edu>
+Description: Fits a Bayesian penalized spline model in which the spline coefficients are modeled with a sum of regression trees.
+License: GNU GPL v3.0
+Depends: Rcpp (>= 1.0.3), RcppArmadillo, splines, splines2
+LinkingTo: Rcpp, RcppArmadillo

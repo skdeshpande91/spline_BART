@@ -9,6 +9,7 @@ class RNG
 public:
   // continuous distributions
   double uniform(double x = 0.0, double y = 1.0);
+  double log_uniform();
   double normal(double mu = 0.0, double sd = 1.0);
   double gamma(double shape, double scale);
   double chi_square(double df);
@@ -20,8 +21,8 @@ public:
   // discrete
   size_t multinom(const size_t &R, const std::vector<double> &probs);
   
-  // vector of standard normals
-  arma::vec std_norm_vec(size_t d);
+  arma::vec std_norm_vec(size_t d); // vector of standard normals
+  arma::mat std_norm_mat(size_t nrow, size_t ncol); // matrix of standard normals
   
   // sample from multivariate normal N(P^-1m, P^-1)
   arma::vec mvnormal(arma::vec m, arma::mat P);

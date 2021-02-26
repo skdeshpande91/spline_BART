@@ -27,9 +27,14 @@ void update_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &th
   
   arma::vec m = arma::zeros<arma::vec>(di.D);
   arma::mat P = arma::zeros<arma::mat>(di.D, di.D);
+  arma::vec mu = arma::zeros<arma::vec>(di.D);
   for(size_t l = 0; l < bnv.size(); l++){
     get_post_params(m, P, sv[l], sigma, di, tree_pi);
-    bnv[l]->setm(gen.mvnormal(m,P));
+    mu = gen.mvnormal(m,P);
+    
+    tree_pi.nu_post += tree_pi.rank_K;
+    tree_pi.scale_post += arma::as_scalar(mu.t() * tree_pi.K * mu) * ( (double) di.M);
+    bnv[l]->setm(mu);
   }
 }
 
@@ -37,7 +42,7 @@ void update_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &th
 // goodbots is computed in update_tree
 void grow_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &theta, std::vector<size_t> &var_counts, xinfo &xi, data_info &di, tree_prior_info &tree_pi, RNG &gen, bool debug)
 {
-  tree::npv goodbots; // leaf notes that are able to be split upon in original tree x
+  tree::npv goodbots; // leaf nodes that are able to be split upon in original tree x
   double PBx = getpb(x, xi, tree_pi, goodbots); // gets the transition prob for growing
   
   accept = 0; // initialize indicator of MH acceptance to 0 (reject)
@@ -46,7 +51,6 @@ void grow_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &thet
 
   std::vector<size_t> goodvars; // variables nx that can non-trivially split on
   getgoodvars(nx, xi, goodvars); // collection of variables that yield non-trivial splits
-  // we ultimately don't make use of goodvars
   
   size_t v = gen.multinom(di.p, theta); // randomly pick the variable to split on in the grow proposal
   
@@ -63,7 +67,7 @@ void grow_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &thet
   
   double Pbotx = 1.0/goodbots.size();
   size_t dnx = nx->depth(); // depth of node nx
-  double PGnx = tree_pi.alpha/pow(1.0 + (double) dnx, tree_pi.beta);
+  double PGnx = tree_pi.alpha/pow(1.0 + (double) dnx, tree_pi.beta); // prob. of growing from nx
   double PGly, PGry;
   if(goodvars.size() > 1){ // we know there are variables we could split l and r on
     PGly = tree_pi.alpha/pow(1.0 + (double) dnx, tree_pi.beta); // depth of new nodes would be 1 + dnx
@@ -113,12 +117,31 @@ void grow_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &thet
   if(sl.n > 0 & sr.n > 0){
     // check that we have at least 1 observation in each of the new leaf nodes
     // otherwise the conditional distribution of (T,mu) is improper
-    double lill = compute_lil(sl, sigma, di, tree_pi);
-    double lilr = compute_lil(sr, sigma, di, tree_pi);
-    double lilp = compute_lil(sp, sigma, di, tree_pi);
+   
+    
+    // [skd]: 23 Feb -- we really should work on the log-scale for alpha computation; will prevent over-flows and the like
     
     double alpha1 = (PGnx*(1.0-PGly)*(1.0-PGry)*PDy*Pnogy)/((1.0-PGnx)*PBx*Pbotx);
-    double alpha2 = alpha1 * exp(lill + lilr - lilp + 0.5 * tree_pi.log_det_K - ( (double) di.D - (double) tree_pi.K_ord) * log(tree_pi.tau) + 0.5 * tree_pi.K_ord * log(2.0 * M_PI));
+    // if alpha1 is equal to 0, then we needn't continue.
+    if(alpha1 > 1e-12){
+      double lill = compute_lil(sl, sigma, di, tree_pi);
+      double lilr = compute_lil(sr, sigma, di, tree_pi);
+      double lilp = compute_lil(sp, sigma, di, tree_pi);
+      double log_alpha2 = log(alpha1) + lill + lilr - lilp;
+      double log_alpha = std::min(0.0, log_alpha2);
+      
+      if(gen.log_uniform() < log_alpha){
+        accept = 1;
+        var_counts[v]++; // [skd]: reread linero; this may need to happen before hand.
+        x.birth(nx->nid(), v, c, di.D); // actually perform the birth
+      }
+    }
+  } // closes if checking that we have > 0 observations in left and right child of nx
+    
+    
+    /*
+    //double alpha1 = (PGnx*(1.0-PGly)*(1.0-PGry)*PDy*Pnogy)/((1.0-PGnx)*PBx*Pbotx);
+    //double alpha2 = alpha1 * exp(lill + lilr - lilp + 0.5 * tree_pi.log_det_K - ( (double) di.D - (double) tree_pi.K_ord) * log(tree_pi.tau) + 0.5 * tree_pi.K_ord * log(2.0 * M_PI));
     // remember we pick up a factor of 0.5*logdet(K) - 0.5*log(tau) * (D - order(K)) in each new leaf
     // In GROW move, we have 2 leafs in numerator and 1 in denominator
     // Prior has a factor of (2 pi)^(-(D - K_ord/2)) and when we integrate out mu we get a factor of (2 pi)^(D/2_
@@ -135,6 +158,7 @@ void grow_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &thet
       x.birth(nx->nid(),v,c,di.D); // actually perform the birth on x.
     }
   }
+  */
   
 }
 
@@ -186,6 +210,22 @@ void prune_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &the
   sinfo sr;
   
   get_suff_prune(sl, sr, sp, x, nl, nr, xi, di);
+  double alpha1 = ((1.0-PGny)*PBy*Pboty)/(PGny*(1.0-PGlx)*(1.0-PGrx)*PDx*Pnogx);
+  if(alpha1 > 1e-12){
+    double log_alpha2 = log(alpha1);
+    double lill = compute_lil(sl, sigma, di, tree_pi);
+    double lilr = compute_lil(sr, sigma, di, tree_pi);
+    double lilp = compute_lil(sp, sigma, di, tree_pi);
+    
+    log_alpha2 = log(alpha1) + lilp - lilr - lill;
+    double log_alpha = std::min(0.0, log_alpha2);
+    if(gen.log_uniform() < log_alpha){
+      accept = 1;
+      x.death(nx->nid(), di.D);
+      var_counts[v]--;
+    }
+  }
+  /*
   
   double lill = compute_lil(sl, sigma, di, tree_pi);
   double lilr = compute_lil(sr, sigma, di, tree_pi);
@@ -208,7 +248,6 @@ void prune_tree(tree &x, size_t &accept, double &sigma, std::vector<double> &the
     x.death(nx->nid(),di.D);
     var_counts[v]--; // decrement the variable counts since we have pruned.
   }
+
+*/
 }
-
-
-

@@ -14,6 +14,7 @@ public:
   size_t N; // total number of observations
   size_t p; // number of predictors
   size_t D; // number of basis vectors
+  size_t M; // number of trees
 
   double *z; // z[j + i*p] is Z_ij
   std::vector<arma::mat>* phi; // points to vector of the Phi matrices
@@ -21,7 +22,7 @@ public:
   std::vector<arma::mat>* tphi_phi; // points to vector of t(Phi) * Phi
   std::vector<arma::vec>* tphi_rf; // points to vector of t(Phi) * (residual). constantly updating in main loop
 
-  data_info(){n = 0; p = 0; D = 0; z = 0; phi = 0; rf = 0; tphi_phi = 0; tphi_rf = 0;}
+  data_info(){n = 0; p = 0; D = 0; M = 0; z = 0; phi = 0; rf = 0; tphi_phi = 0; tphi_rf = 0;}
 };
 
 class tree_prior_info{
@@ -32,11 +33,17 @@ public:
   double beta;
   arma::mat K; // precision matrix for the mu vector in each leaf
   double log_det_K; // holds log of generalized determinant of Omega. will be passed in by user
-  double tau; // variance scaling (if we ever use it)
-  size_t K_ord; // order of K (typically always equal to 1)
+  //size_t K_ord; // order of K (typically always equal to 1)
+  size_t rank_K; // rank of prior "precision" matrix.
  
+  double tau; //
+  double nu_tau; // prior hyperparameter for tau
+  double lambda_tau; // prior hyperparameter for tau
+  double nu_post; // posterior hyperparameter for tau; constantly updated
+  double scale_post; // posterior hyperparameter for tau; constantly updated
+
   // t(Phi_i)*r_i is needed to compute the posterior mean of mu
-  tree_prior_info(){pbd = 1.0; pb = 0.5; alpha = 0.95; beta = 2.0; K = arma::zeros<arma::mat>(1,1); log_det_K = 0.0; tau = 1.0; K_ord = 1;}
+  tree_prior_info(){pbd = 1.0; pb = 0.5; alpha = 0.95; beta = 2.0; K = arma::zeros<arma::mat>(1,1); log_det_K = 0.0; rank_K = 1; tau = 1.0; nu_tau = 1.0; lambda_tau = 1.0; nu_post = 1.0; scale_post = 1.0;}
 };
 
 class sigma_prior_info{

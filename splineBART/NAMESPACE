@@ -1,0 +1,5 @@
+export("get_rw_precision")
+export("splineBART")
+export("summarize_posterior")
+useDynLib(splineBART)
+

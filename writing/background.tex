@@ -1,5 +1,4 @@
 %!TEX root = splineBART_main.tex
-
 \subsection{The P splines regression model.}
 \citet{EilersMarx1996} introduced penalized splines (P-splines) for curve fitting.
 Given data $(x_{i}, y_{i})$ they proposed solving
@@ -27,9 +26,9 @@ $$
 They fit the following model
 \begin{align}
 p(\by \vert \beta, \sigma^{2}) &\propto (\sigma^{2})^{\frac{-n_{i}}{2}}\exp\{-\frac{1}{2\sigma^{2}}\Vert \by - \Phi\beta \rVert_{2}^{2}\} \\
-p(\beta) &\propto (2\pi\tau^{2})^{-\frac{D - t}{2}}\left(\left\lvert K_{t} \right\rvert^{*}\right)^{\frac{1}{2}}\exp\{-\frac{1}{2\tau^{2}}\beta^{\top}K_{t}\beta\}
+p(\beta) &\propto (2\pi\tau^{2})^{-\frac{\rk(K_{t})}{2}}\left(\left\lvert K_{t} \right\rvert^{*}\right)^{\frac{1}{2}}\exp\{-\frac{1}{2\tau^{2}}\beta^{\top}K_{t}\beta\}
 \end{align}
-where $\lvert \cdot \rvert^{*}$ is the \textit{generalized determinant}, defined to the product of the non-zero eigenvalues \citep{RueHeld2005}.
+where $\lvert \cdot \rvert^{*}$ is the \textit{generalized determinant}, defined to the product of the non-zero eigenvalues \citep{RueHeld2005}, and $\rk(K)$ is the rank of the matrix $K$.
 
 \subsection{Bayesian treed regression.}
 To set our notation, let $T$ be a binary decision tree partitioning $\R^{p}$ that consists of a collection of interior nodes and $L(T)$ terminal or \emph{leaf} nodes.
@@ -61,39 +60,43 @@ Building on \citet{Chipman1998}, \citet{Chipman2010} specify the regression tree
 
 \textbf{Decision tree prior}. \citet{Chipman1998}'s decision tree prior can be described with a branching process.
 To sample from the prior, starting from the root node, one first randomly decides whether or not to continue growing the tree from each of the current leaves. 
-Conditional on growing the tree from $\eta$, we first draw the new split variable index $v(\eta)$ and then drawn the cutpoint $c(\eta)$ conditionally on $v(\eta).$
-
 In the branching process, the probability that a node at depth $d$ is non-terminal is $0.95(1 + d)^{-2}.$
 This ensures that the prior places overwhelming probability on trees of depth five or less.
 
+Conditional on growing the tree from the node $\nx$, we first draw the new split variable index from a multinomial distribution
+$$
+v(\nx) \sim \text{Multinomial}(\theta_{1}, \ldots, \theta_{p})
+$$
+where $\theta_{j}$ is the probability of splitting on $Z_{j}$ at node $\nx.$
+Then, a cutpoint $c(\nx)$ is drawn conditionally on $v(\nx).$
 
 Whereas \citet{Chipman2010} set each $\theta_{j} = 1/p,$ we follow \citet{Linero2018} and attempt to learn the split probabilities from the data.
-Specifically, we place a $\text{Dirichlet}(\alpha/p, \ldots, \alpha/p)$ prior on $\theta.$
-We complete our prior specification with a discrete prior over $u_{j} = \alpha_{j}/(R + \alpha_{j})$ where
+Specifically, we model $\theta \sim \text{Dirichlet}(\eta/p, \ldots, \eta/p).$
+We complete our prior specification with a discrete prior over $u_{j} = \eta_{j}/(p + \eta_{j})$ where
 $$
 p(u = u_{t}) \propto (u_{t})^{a-1}(1 - u_{t})^{b-1}
 $$
-where $\{u_{1}, \ldots, u_{N}\}$ is a pre-specified grid of values in $[0,1].$
+where $\{u_{1}, \ldots, u_{N}\}$ is a pre-specified grid of values in $[0,1]$ and $a,b > 0$ are positive constants.
 
-Conditionally on $v(\eta) = j,$ we select $c(\eta)$ uniformly from the set of non-trivial cutpoints.
+Conditionally on $v(\nx) = j,$ we select $c(\nx)$ uniformly from the set of non-trivial cutpoints.
 Recall that a cutpoint is \textit{trivial} if it leads to a decision rule that contradicts a decision rule higher in the tree.
-For instance, the rule $\{Z_{1} \leq 2 \}$ would be trivial at $\eta$ if an ancestor of $\eta$ is associated with the rule $\{Z_{1} \leq 1\}.$
-If there are no non-trivial cutpoints at $\eta$, we select $c(\eta)$ uniformly from the set of \textit{all} available cutpoints for variable $Z_{v(\eta)}.$ 
+For instance, the rule $\{Z_{1} \leq 2 \}$ would be trivial at $\nx$ if an ancestor of $\nx$ is associated with the rule $\{Z_{1} \leq 1\}.$
+If there are no non-trivial cutpoints at $\nx$, we select $c(\nx)$ uniformly from the set of \textit{all} available cutpoints for variable $Z_{v(nx)}.$ 
 This is the ``Assumption 2'' prior introduced in \citet{Linero2018}.
 
-After we update each tree in $\mathcal{E}_{j},$ we can use a conjugate update of $\theta_{j}$:
+After we update each tree in $\mathcal{E}$ we can use a conjugate update of $\theta$:
 $$
-\theta_{j} \mid \mathcal{E}_{j} \sim \text{Dirichlet}(\alpha_{j}/R + s_{j1}, \ldots, \alpha_{j}/R + s_{jR}).
+\theta \mid \mathcal{E}, \bY \sim \text{Dirichlet}(\eta/p + s_{1}, \ldots, \eta/p + s_{p}),
 $$
+where $s_{j}$ counts the number of nodes $\nx$ which split on the variable $Z_{j}.$
 
-The posterior mass function on $\alpha_{j}$ is given by
+The posterior mass function on $\eta$ is given by
 \begin{align}
 \begin{split}
-p(\alpha_{j} = \alpha_{j}^{(t)} \mid \theta_{j}, \ldots) &\propto \frac{\Gamma(\alpha^{(t)}_{j})}{\Gamma(\alpha^{(t)}/R)^{R}} \times \left(\prod_{r = 1}^{R}{\theta_{jr}}\right)^{\alpha_{j}^{(t)}/R} \\
-&\times \frac{1}{R}\left(\frac{\alpha_{j}^{(t)}}{\alpha_{j}^{(t)} + R}\right)^{a-1}\left(\frac{R}{\alpha_{j}^{(t)} + R}\right)^{b+1}
+p(\eta = \eta^{(t)} \mid \theta \ldots) &\propto \frac{\Gamma(\eta^{(t)})}{\Gamma(\eta^{(t)}/p)^{p}} \times \left(\prod_{j = 1}^{p}{\theta_{j}}\right)^{\eta^{(t)}/p} \\
+&\times \frac{1}{p}\left(\frac{\eta^{(t)}}{\eta^{(t)} + p}\right)^{a-1}\left(\frac{p}{\eta^{(t)} + p}\right)^{b+1}
 \end{split}
 \end{align}
-
 We will restrict $u^{(t)} = t/N_{u}$ for $t = 1, \ldots, N_{u} - 1$ where $N_{u}$ is a parameter passed by the user.
 
 \textbf{Treed spline regression}.

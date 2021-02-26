@@ -16,7 +16,7 @@ void get_post_params(arma::vec &m, arma::mat &P, sinfo &si,  double &sigma, data
 {
   // re-set mean and prec_chol just in case we don't do this out of the loop
   
-  P = 1.0/pow(tree_pi.tau, 2.0) * tree_pi.K; // prior precision matrix of the spline coefficients
+  P = ((double) di.M * 1.0/pow(tree_pi.tau, 2.0)) * tree_pi.K; // prior precision matrix of the spline coefficients.
   m = arma::zeros<arma::vec>(di.D);
   
   for(size_t ix = 0; ix < si.n; ix++){
@@ -43,7 +43,13 @@ double compute_lil(sinfo& si, double &sigma, data_info &di,  tree_prior_info &tr
   // since L is lower triangular this is just -1.0 * arma::accu(arma::log(L.diag())
   double log_det_L = arma::accu(arma::log(L.diag())); // take advantage of the fact L is lower triangular
   
-  return(-1.0 * log_det_L + 0.5 * quad_form);
+  // now deal with the extra factors
+  double lil = -0.5 * ( (double) di.D - (double) tree_pi.rank_K) * log(2.0 * M_PI);
+  lil += 0.5 * tree_pi.log_det_K;
+  lil += ( (double) tree_pi.rank_K ) * (0.5 * log( (double) di.M) - log(tree_pi.tau));
+  lil += 0.5 * quad_form - 1.0 * log_det_L;
+  return(lil);
+  
 }
 
 

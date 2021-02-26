@@ -1,4 +1,28 @@
 %!TEX root = splineBART_main.tex
+We propose a minor extension of \citet{Low-Kamn2015}'s procedure: rather than approximating $\bbeta(\bz)$ with a single regression tree, we instead approximate it with a sum of $M$ regression trees:
+$$
+\bbeta(\bz) \approx \sum_{m = 1}^{M}{g(\bz; T_{m}, \bmu_{m})}.
+$$
+
+We will explore several different specifications of the spline basis $\{\phi_{1}(\cdot), \ldots, \phi_{D}(\cdot)\}$ and consider several (possibly improper) priors for the jumps $\mu_{\ell},$ all of which have density of the form
+$$
+p(\mu \mid \tau^{2}) = \left(2\pi\tau^{2}/M\right)^{-\rk(K)/2} \times \left(\lvert K \rvert^{*}\right)^{1/2} \times\exp\left\{-\frac{M}{2\tau^{2}}\mu^{\top}K\mu\right\}.
+$$
+Note that when $K$ is positive definite, we have $\bbeta(\bz) \sim \N_{D}(\mathbf{0}, \tau^{2}K^{-1})$ marginally for each $\bz.$
+%We will also consider different prior specifications for the two scale parameters $\sigma^{2}$ and $\tau^{2}$: a conjugate Inverse Gamma prior and a half-t prior.
+
+If we let $\Ecal = \{(T_{m}, \bmu_{m})\}_{m = 1}^{M}$ be the entire collection of regression trees, our data likelihood is given by
+\begin{equation}
+\label{eq:likelihood}
+p(\bY \vert \sigma^{2}, \Ecal) \propto \prod_{i = 1}^{n}{\left(\sigma^{2}\right)^{-\frac{n_{i}}{2}}\exp\left\{-\frac{1}{2\sigma^{2}}\left\lVert \by_{i} - \Phi_{i}\sum_{m = 1}^{M}{g(\bz_{i};T_{m}, \bmu_{m})}\right\rVert_{2}^{2}\right\}}
+\end{equation}
+We use a Gibbs sampler to draw approximate samples from the posterior distribution $p(\Ecal, \sigma^{2}, \tau^{2} \vert \bY).$
+At a high-level, our Gibbs sampler sequentially updates each regression tree $(T_{m}, \bmu_{m})$ while keeping the remaining $M-1$ trees fixed.
+
+
+
+
+\begin{comment}
 We propose a very minor extension of \citet{Low-Kam2015}'s procedure: rather than approximating $\bbeta(\bz)$ with a single regression tree, we instead approximate it with a sum of $M$ regression trees:
 $$
 \bbeta(\bz) \approx \sum_{m = 1}^{M}{g(\bz; T_{m}, \bmu_{m})}.
@@ -18,7 +42,7 @@ p(\bY \vert \sigma^{2}, \Ecal) \propto \prod_{i = 1}^{n}{\left(\sigma^{2}\right)
 \end{equation}
 We use a Gibbs sampler to draw approximate samples from the posterior distribution $p(\Ecal, \sigma^{2} \vert \bY).$
 At a high-level, our Gibbs sampler sequentially updates each regression tree $(T_{m}, \bmu_{m})$ while keeping the remaining $M-1$ trees fixed.
-
+\end{comment}
 
 %\skd{Note: \citet{Low-Kam2015} use a first-order random walk prior on the splines coefficients. They then modify the diagonal to make it positive definit}
 % check out slide 27 for more details of 2nd order differences: https://people.stat.sc.edu/hansont/stat740/Pspline.pdf

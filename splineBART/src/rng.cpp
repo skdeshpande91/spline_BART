@@ -4,6 +4,9 @@
 double RNG::uniform(double x, double y ){
   return R::runif(x,y);
 }
+double RNG::log_uniform(){
+  return(log(uniform(0.0,1.0)));
+}
 double RNG::normal(double mu, double sd ){
   return R::rnorm(mu,sd);
 }
@@ -57,6 +60,15 @@ arma::vec RNG::std_norm_vec(size_t d){
   for(size_t i = 0; i < d; i++) results(i) = normal(0.0,1.0);
   return(results);
 }
+
+arma::mat RNG::std_norm_mat(size_t nrow, size_t ncol){
+  arma::mat results(nrow, ncol);
+  for(size_t i = 0; i < nrow; i++){
+    for(size_t j = 0; j < ncol; j++) results(i,j) = normal(0.0, 1.0);
+  }
+  return(results);
+}
+
 
 arma::vec RNG::mvnormal(arma::vec m, arma::mat P){
   size_t d = m.size();

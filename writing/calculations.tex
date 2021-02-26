@@ -3,35 +3,33 @@
 In order to simulate approximate samples from the posterior $p(\Ecal, \sigma \vert \bY),$ we extend the basic Gibbs sampler for BART developed in \citet{Chipman2010}.
 At a high level, our sampler alternates between (i) updating each regression tree $(T_{m}, \bmu_{m})$ conditionally on the remaining trees and $\sigma$ and (ii) updating $\sigma$ conditionally given the full tree ensemble $\Ecal.$
 
-
 \textbf{Updating $\sigma$}. Let $\br_{1}, \ldots, \br_{n}$ be the n residual vectors defined by
 $$
 \br_{i} = \by_{i} - \Phi_{i}\sum_{m = 1}^{M}{g(\bz_{i}; T_{m}, \bmu_{m})}.
 $$
 Observe that the conditional posterior density of $\sigma^{2}$ given the data $\bY$ and the tree ensemble $\Ecal$ is given by
 $$
-p(\sigma^{2} \vert \bY, \Ecal) \propto p(\sigma^{2})\times(\sigma^{2})^{-\frac{N}{2}}\exp\{-\frac{1}{2\sigma^{2}}\sum_{i = 1}^{n}{\br_{i}^{\top}\br_{i}}\},
+p(\sigma^{2} \vert \bY, \Ecal) \propto p(\sigma^{2})\times(\sigma^{2})^{-\frac{N}{2}}\exp\left\{-\frac{1}{2\sigma^{2}}\sum_{i = 1}^{n}{\br_{i}^{\top}\br_{i}}\right\},
 $$
 where $N = \sum_{i}{n_{i}}$ is the total number of observations across all surfaces.
 
-With conjugate prior $\sigma^{2} \sim \text{Inv. Gamma}(\nu/2, \lambda\nu/2),$ we conclude
+With conjugate prior $\sigma^{2} \sim \text{Inv.~Gamma}(\nu_{\sigma}/2, \lambda_{\sigma}\nu_{\sigma}/2),$ we conclude
 $$
-\sigma^{2} \vert \bY, \Ecal \sim \text{Inv. Gamma}\left(\frac{\nu + N}{2}, \frac{1}{2}\left(\lambda\nu + \sum_{i = 1}^{n}{\br_{i}^{\top}\br_{i}}\right)\right).
+\sigma^{2} \vert \bY, \Ecal \sim \text{Inv.~Gamma}\left(\frac{\nu + N}{2}, \frac{1}{2}\left(\lambda\nu + \sum_{i = 1}^{n}{\br_{i}^{\top}\br_{i}}\right)\right).
 $$
 
-
-\skd{We could also place a half-$t_{\nu}$ prior on $\sigma$. If we did, we would need to use a MH step but there's a really clever choice of transition that makes this incredibly easy. Will fill in the details later on.} 
+%\skd{We could also place a half-$t_{\nu}$ prior on $\sigma$. If we did, we would need to use a MH step but there's a really clever choice of transition that makes this incredibly easy. Will fill in the details later on.} 
 
 \textbf{Updating regression trees}. 
 Like \citet{Chipman2010}, we update the $m^{\text{th}}$ regression tree $(T_{m}, \bmu_{m})$ in two steps.
-Given the current value of the $m^{\text{th}}$ decision tree, we draw a new decision tree from the marginal posterior distribution $p(T_{m} \vert \bY, \sigma, \Ecal^{-(m)}).$
-Then, conditionally on the value of $T_{\text{new}},$ we draw new jumps from the conditional posterior $p(\bmu \vert T_{\text{new}}, \bY, \sigma, \Ecal^{-(m)}).$
+Given the current value of the $m^{\text{th}}$ decision tree, we draw a new decision tree from the marginal posterior distribution $p(T_{m} \vert \bY, \Ecal^{-(m)}, \sigma^{2}, \tau^{2}).$
+Then, conditionally on the value of $T_{\text{new}},$ we draw new jumps from the conditional posterior $p(\bmu \vert T_{\text{new}}, \bY, \Ecal^{-(m)}, \sigma^{2}, \tau^{2}).$
 
 We use a Metropolis-Hastings step to draw a new decision tree.
 Specifically, given the current value $T_{m} = T$ we propose a new tree $T^{\star}$ according to a transition kernel $q(\cdot \vert T)$ and compute the MH acceptance ratio
 \begin{equation}
 \label{eq:mh_ratio}
-\alpha(T, T^{\star}) = \frac{p(T^{\star})p(\bY \vert T^{\star}, \Ecal^{-(m)})q(T \vert T^{\star})}{p(T)p(\bY \vert T, \Ecal^{-(m)})q(T^{\star} \vert T)} \wedge 1
+\alpha(T, T^{\star}) = \frac{p(T^{\star})p(\bY \vert T^{\star}, \Ecal^{-(m)}, \sigma^{2}, \tau^{2})q(T \vert T^{\star})}{p(T)p(\bY \vert T, \Ecal^{-(m)}, \sigma^{2}, \tau^{2})q(T^{\star} \vert T)} \wedge 1
 \end{equation}
 We then set $T_{m} = T^{\star}$ with probability $\alpha(T, T^{\star})$ and set $T_{m} = T$ with residual probability.
 
@@ -39,6 +37,21 @@ We use a simplified version of \citet{Chipman1998}'s transition kernel, construc
 We construct the transition kernel in such a way to facilitate considerable cancellation in the acceptance ratio.
 Before deriving closed form expressions of the acceptance ratios for each move, we first derive a closed form expression of the marginal likelihood of the decision tree $T_{m}$ given the remaining $M - 1$ trees.
 In doing so, we derive the conditional posterior distribution of the jumps $\bmu_{m}.$
+
+\textbf{Updating $\tau^{2}$}. Observe that
+$$
+p(\tau^{2} \mid \bY, \Ecal, \sigma^{2}) \propto p(\tau^{2}) \times \prod_{m = 1}^{M}{\prod_{\ell = 1}^{L(T_{m})}{\left(\tau^{2}\right)^{-\frac{\rk(K)}{2}}\exp\left\{-\frac{M}{2\tau^{2}}\mu_{\ell}^{\top}K\mu_{\ell}\right\}}}
+$$
+
+Let $L^{\star} = \sum_{m = 1}^{M}{L(T_{m})}$ be the total number of leaves in $\Ecal$ and let 
+$$
+B^{\star} = M\sum_{m = 1}^{M}{\sum_{\ell = 1}^{L(T_{m})}{\mu_{\ell}^{\top}K\mu_{\ell}}}.
+$$
+
+With a conjugate prior $\tau^{2} \sim \text{Inv.~Gamma}(\nu_{\sigma}/2, \lambda_{\sigma}\nu_{\sigma}/2),$ we conclude 
+$$
+\tau^{2} \mid \bY, \Ecal, \sigma^{2} \sim \text{Inv.~Gamma}\left(\frac{\nu_{\tau} + \rk(K)\times L^{\star}}{2}, \frac{\nu_{\tau}\lambda_{\tau} + B^{\star}}{2}\right).
+$$
 
 \subsection{Marginal likelihood of $T_{m}$}
 
@@ -54,33 +67,38 @@ $$
 $$
 
 Now, suppose $T_{m}$ contained $L$ leaves and suppose that $\mu_{\ell}$ is the jump associated to leaf $\ell.$
-If we let $I(\ell;T_{m})$ be the set of indices $i$ corresponding to the leaf $\ell,$ we see immediately that
+If we let $I(\ell;T_{m})$ be the set of indices $i$ corresponding to the leaf $\ell,$ we compute
 \begin{equation}
-p(\bmu_{m} \vert T_{m})p(Y \vert T_{m}, \bmu_{m}, \Ecal^{-(m)}, \sigma^{2}) \propto \prod_{\ell = 1}^{L}{p(\mu_{\ell})\exp\left\{-\frac{1}{2\sigma^{2}}\sum_{i \in I(\ell;T_{m})}{\lVert \br_{i}^{(-m)} - \Phi_{i}\mu_{\ell}\rVert_{2}^{2}}\right\}}
+p(\bmu_{m} \mid T_{m}, \tau^{2})p(Y \vert T_{m}, \bmu_{m}, \Ecal^{-(m)}, \sigma^{2}) \propto \prod_{\ell = 1}^{L}{p(\mu_{\ell} \mid \tau^{2})\exp\left\{-\frac{1}{2\sigma^{2}}\sum_{i \in I(\ell;T_{m})}{\lVert \br_{i}^{(-m)} - \Phi_{i}\mu_{\ell}\rVert_{2}^{2}}\right\}}
 \end{equation}
 
 Recalling that
 $$
-p(\mu_{\ell}) = (2\pi\tau^{2})^{-\frac{D - t}{2}}\left(\lvert K_{t}\rvert^{*}\right)^{\frac{1}{2}}\exp\{-\frac{1}{2\tau^{2}}\mu_{\ell}^{\top}K_{t}\mu_{\ell}\},
+p(\mu_{\ell} \mid \tau^{2}) = (2\pi\tau^{2}/M)^{-\frac{\rk(K)}{2}}\left(\lvert K\rvert^{*}\right)^{\frac{M}{2}}\exp\left\{-\frac{1}{2\tau^{2}}\mu_{\ell}^{\top}K\mu_{\ell}\right\},
 $$
 we conclude
-\begin{align}
-\begin{split}
+%\begin{align}
+%\begin{split}
+\begin{equation}
 \label{eq:Y_mu_joint}
-p(\bY, \bmu_{m} \vert T_{m}, \Ecal_{-m}, \sigma^{2}) &\propto \prod_{\ell = 1}^{L}{\left[(2\pi\tau^{2})^{-\frac{D - t}{2}}\left(\lvert K_{t} \rvert^{*}\right)^{\frac{1}{2}}\right]} \\
-~ &\times \prod_{\ell = 1}^{L}{\int{\exp\{-\frac{1}{2}\left[\mu_{\ell}^{\top}P_{\ell}\mu_{\ell} - 2\mu_{\ell}^{\top}m_{\ell}\right]\}d\mu_{\ell}}}
-\end{split}
-\end{align}
+p(\bY, \bmu_{m} \mid T_{m}, \ldots) \propto \prod_{\ell = 1}^{L(T_{m})}{(2\pi\tau^{2}/M)^{-\frac{\rk(K)}{2}}\left(\lvert K \rvert^{*}\right)^{\frac{1}{2}} \times \exp\left\{-\frac{1}{2}\left[\mu_{\ell}^{\top}P_{\ell}\mu_{\ell} - 2\mu_{\ell}^{\top}m_{\ell}\right]\right\}}
+\end{equation}
+%p(\bY, \bmu_{m} \vert T_{m}, \Ecal_{-m}, \sigma^{2}) &\propto \prod_{\ell = 1}^{L}{\left[(2\pi\tau^{2})^{-\frac{\rk(K)}{2}}\left(\lvert K \rvert^{*}\right)^{\frac{1}{2}}\right]} \\
+%~ &\times \prod_{\ell = 1}^{L}{\exp\left\{-\frac{1}{2}\left[\mu_{\ell}^{\top}P_{\ell}\mu_{\ell} - 2\mu_{\ell}^{\top}m_{\ell}\right]\right\}}
+%\end{split}
+%\end{align}
 where
 \begin{align}
-P_{\ell} &= \tau^{-2}K_{t} + \sigma^{-2}\sum_{i \in I(\ell;T_{m})}{\Phi_{i}^{\top}\Phi_{i}} \\
-m_{\ell} &= \sigma^{-2}\sum_{i \in I(\ell;T_{m})}{\Phi_{i}^{\top}\br_{i}^{(-m)}}.
+\label{eq:mu_post_params}
+P_{\ell} &= \tau^{-2}M \times K + \sigma^{-2}\sum_{i \in I(\ell;T_{m})}{\Phi_{i}^{\top}\Phi_{i}} &\text{and} & &  m_{\ell} &= \sigma^{-2}\sum_{i \in I(\ell;T_{m})}{\Phi_{i}^{\top}\br_{i}^{(-m)}}
+%m_{\ell} &= \sigma^{-2}\sum_{i \in I(\ell;T_{m})}{\Phi_{i}^{\top}\br_{i}^{(-m)}}.
 \end{align}
 
 Integrating out $\bmu_{m}$ from Equation~\eqref{eq:Y_mu_joint}, we conclude
 \begin{align}
 \label{eq:tree_likelihood}
-p(\bY \vert T_{m}, \Ecal^{-(m)}, \sigma^{2}) &\propto \prod_{\ell = 1}^{L}{\left[(2\pi\tau^{2})^{\frac{t}{2}}\left(\lvert K_{t} \rvert^{*}\right)^{\frac{1}{2}} \times \lvert P_{\ell} \rvert^{-\frac{1}{2}}\exp\left\{\frac{1}{2}\mu_{\ell}^{\top}P_{\ell}^{-1}\mu_{\ell}\right\}\right]} 
+p(\bY \vert T_{m}, \ldots) &\propto \prod_{\ell = 1}^{L}{\left[(2\pi)^{-\frac{D - \rk(K)}{2}}(\tau^{2}/M)^{-\frac{\rk(K)}{2}}\left(\lvert K \rvert^{*}\right)^{\frac{1}{2}} \times \lvert P_{\ell} \rvert^{-\frac{1}{2}}\exp\left\{\frac{1}{2}\mu_{\ell}^{\top}P_{\ell}^{-1}\mu_{\ell}\right\}\right]}
+%p(\bY \vert T_{m}, \Ecal^{-(m)}, \sigma^{2}) &\propto \prod_{\ell = 1}^{L}{\left[(2\pi\tau^{2})^{\frac{t}{2}}\left(\lvert K_{t} \rvert^{*}\right)^{\frac{1}{2}} \times \lvert P_{\ell} \rvert^{-\frac{1}{2}}\exp\left\{\frac{1}{2}\mu_{\ell}^{\top}P_{\ell}^{-1}\mu_{\ell}\right\}\right]} 
 \end{align}
 
 We also conclude from Equation~\eqref{eq:tree_likelihood} that if $\bmu_{m} = \{\mu_{1}, \ldots, \mu_{L}\},$ then
